@@ -61,6 +61,7 @@ import de.uniba.wiai.lspi.chord.service.NotifyCallback;
 import de.uniba.wiai.lspi.chord.service.Report;
 import de.uniba.wiai.lspi.chord.service.ServiceException;
 import de.uniba.wiai.lspi.util.logging.Logger;
+import haw.Starter;
 
 /**
  * Implements all operations which can be invoked on the local node.
@@ -1004,11 +1005,11 @@ public final class ChordImpl implements Chord, Report, AsynChord {
 		return ChordRemoveFuture.create(this.asyncExecutor, this, key, entry);
 	}
 
+
 	// TODO: implement this function in TTP
 	// send broadcast to all nodes in finger table
 	Random r = new Random();
 	public int trnID = r.nextInt(1000);
-
 	@Override
 	public void broadcast(ID target, Boolean hit) {
 		this.logger.debug("App called broadcast");
@@ -1017,16 +1018,29 @@ public final class ChordImpl implements Chord, Report, AsynChord {
 
 			List<Node> ft = getFingerTable();
 			Collections.sort(ft);
+			printStart(target, hit);
 			ID rng = this.localID;
 			ID src = getID();
-
 			Broadcast info = new Broadcast(rng, src, target, trnID, hit);
 
 			localNode.broadcast(info);
-
+			printEnd();
 		} catch (CommunicationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}
+	}
+
+	private void printStart(ID target, boolean hit) {
+		if (Starter.PRINT_FINE_GRAIN_SIZE) {
+			System.out.println("\t°°°°°ChordImpl.java°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°");
+			System.out.println("\t°\n\t° BROADCASTING: [target=" + target + ", hit=" + hit + "]\n\t°");
+		}
+	}
+
+	private void printEnd() {
+		if (Starter.PRINT_FINE_GRAIN_SIZE) {
+			System.out.println("\t°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°");
 		}
 	}
 

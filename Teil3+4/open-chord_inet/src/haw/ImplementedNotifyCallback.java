@@ -7,14 +7,20 @@ public class ImplementedNotifyCallback implements NotifyCallback {
 
 	@Override
 	public void retrieved(ID target) {
-		System.out.println("RETRIEVED AT: \n\t" + target.toString());
+		System.out.println("\n\n\nRECIVED A SHOT IN OUR AREA AT: \n\t" + target.toString());
+		Sea.getInstance().shotDetectedInTheAreaOfThisNode(target);
 	}
 
 	@Override
 	public void broadcast(ID source, ID target, Boolean hit) {
-		System.out.println("BROADCAST: \n\t source: " + source.toString()
-									+ "\n\t target: " + target.toString()
-									+ "\n\t hit: " + hit.toString());
+		if (!source.equals(Sea.getInstance().getMyID())) {
+			// If a new player "joins the game": add new user to player list and
+			// recalculate the ranges of everyone
+			if (!Sea.getInstance().getMapOfPlayers().containsKey(source)) {
+//				Sea.getInstance().joinPlayerById(source);
+//				Sea.getInstance().calculateRanges();
+			}
+		}
 	}
 
 }

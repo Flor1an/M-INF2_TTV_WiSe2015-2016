@@ -51,6 +51,11 @@ import de.uniba.wiai.lspi.chord.data.ID;
 import de.uniba.wiai.lspi.chord.data.URL;
 import de.uniba.wiai.lspi.chord.service.NotifyCallback;
 import de.uniba.wiai.lspi.util.logging.Logger;
+import haw.ChordRange;
+import haw.Player;
+import haw.Sea;
+import haw.Starter;
+import haw.State;
 
 /**
  * Implements all operations which can be invoked remotely by other nodes.
@@ -413,41 +418,53 @@ public final class NodeImpl extends Node {
 			}
 			/////////////////// lab code inserted below
 
-			List<Node> ft = impl.getFingerTable();
-			Collections.sort(ft);
+			// Logging
+			printBC(info);
 
-			System.out.println("Finger Tabe: \t " + ft);
+			// log all targets someone shot already and save if ship was
+			// destroyed
+			storeTarget(info);
 
-			// ZITAT: "2.1 Der Empfänger eines Broadcast-Pakets stellt
-			// dieses seiner Applikation zu und ...
-			for (int i = 0; i < ft.size(); i++) {
+			if (info.getTransaction() <= impl.trnID) {
+				impl.trnID = Math.max(info.getTransaction(), impl.trnID);
+				List<Node> ft = impl.getFingerTable();
+				Collections.sort(ft);
 
-				//
-				if (!ft.get(i).getNodeID().isInInterval(this.getNodeID(), info.getRange())) {
-					break;
+				printFT(ft);
+
+				// ZITAT: "2.1 Der Empfänger eines Broadcast-Pakets stellt
+				// dieses seiner Applikation zu und ...
+				for (int i = 0; i < ft.size(); i++) {
+
+					// 
+					if (!ft.get(i).getNodeID().isInInterval(this.getNodeID(), info.getRange())) {
+						printDroppedBC(info);
+						break;
+					}
+
+					// 2.2...leitet es an alle Knoten weiter,
+					// welche gemäß seiner Finger Table zwischen seiner eigenen
+					// ID und dem RangeHash liegen...
+					ID rng = null;
+					if (i != ft.size() - 1) {
+						// 2.3...Dabei trägt er analog den jeweils
+						// darauffolgenden Finger Table Eintrag in das
+						// RangeHash-Feld ein"
+						rng = ft.get(i + 1).getNodeID();
+
+					} else {
+						// Ausnahme: Einmal um den Ring
+						rng = info.getRange();
+					}
+
+					Broadcast info2 = new Broadcast(rng, info.getSource(), info.getTarget(), impl.trnID, info.getHit());
+					printForwardedBC(ft.get(i).getNodeID(), rng, info);
+					ft.get(i).broadcast(info2);
+
 				}
-
-				// 2.2...leitet es an alle Knoten weiter,
-				// welche gemäß seiner Finger Table zwischen seiner eigenen
-				// ID und dem RangeHash liegen...
-				ID rng = null;
-				if (i != ft.size() - 1) {
-					// 2.3...Dabei trägt er analog den jeweils
-					// darauffolgenden Finger Table Eintrag in das
-					// RangeHash-Feld ein"
-					rng = ft.get(i + 1).getNodeID();
-
-				} else {
-					// Ausnahme: Einmal um den Ring
-					rng = info.getRange();
-				}
-
-				Broadcast info2 = new Broadcast(rng, info.getSource(), info.getTarget(), impl.trnID, info.getHit());
-				System.out.println("Forwording broadcast: \t " + info2 + "\n\t\t TO: " + ft.get(i).getNodeID());
-				ft.get(i).broadcast(info2);
 
 			}
-
+			printEnd();
 			/////////////////// lab code inserted above
 
 			// finally inform application
@@ -455,12 +472,93 @@ public final class NodeImpl extends Node {
 				this.notifyCallback.broadcast(info.getSource(), info.getTarget(), info.getHit());
 			}
 
-		} catch (
-
-		Exception e)
-
-		{
+		} catch (Exception e) {
 			e.printStackTrace();
+		}
+	}
+
+	private void printBC(Broadcast info) {
+		if (Starter.PRINT_FINE_GRAIN_SIZE) {
+			System.out.println("\t°\t+--NodeImpl.java---------------------------------------------------------------------------------------------");
+			System.out.println("\t°\t| Broadcast recived:\n\t°\t|\tsource:\t" + info.getSource() + "\n\t°\t|\trange:\t" + info.getRange()
+					+ "\n\t°\t|\ttarget:\t" + info.getTarget() + "\n\t°\t|\ttns:\t" + info.getTransaction() + "\n\t°\t|\thit:\t" + info.getHit());
+		} else {
+			if (info.getSource() != impl.getID()) {
+				System.out.println("(" + info.getTransaction() + ": heard [source=" + info.getSource() + ", target=" + info.getTarget() + ", hit="
+						+ info.getHit() + "])");
+			}
+		}
+	}
+
+	private void storeTarget(Broadcast info) {
+		if (info.getHit()) {
+			Sea.getInstance().getMapOfTargetsSomeoneShootTo().put(info.getTarget(), State.SHIP_DESTROYED);
+
+			HashMap<ID, Player> players = Sea.getInstance().getMapOfPlayers();
+			if (players.containsKey(info.getSource())) {
+				Player p = players.get(info.getSource());
+				p.increaseLostShipCount();
+
+				if (p.getLostShips() >= Starter.AMOUNT_OF_SHIPS) {
+					printNuke(p.getPlayerID());
+				}
+			}
+
+		} else {
+			Sea.getInstance().getMapOfTargetsSomeoneShootTo().put(info.getTarget(), State.SHIP_MISSED);
+		}
+	}
+
+	private void printNuke(ID pID) {
+		Timestamp t = new Timestamp(System.currentTimeMillis());
+
+		System.out.print(
+				"                                                         ú\n" + "                                                  ,se%n.   ,  ù\n"
+						+ "                                               ,seý'  `ý'ù,$\n"
+						+ "                                             ,sý'  ù  `s,,$$.   ù\n"
+						+ "                                         ,. ,$'   ú  ù `$F^?$ý'  ú\n"
+						+ "                     .,ssSS$$$SSss,.  .sS$$s;ý        ,ý'$s$$, ù\n"
+						+ "                  ,sS$$$$$$$$$$$$$$$s$$$$$$$$,      ù  ù $'ù`ý.\n"
+						+ "                ,s$?M$$$$$$$$$$$$$$$$$$$$$$ý'            ' ú  ú\n"
+						+ "               ,$V;;tY$$$$$$$$$$$$$$$$$$$F'         ú   ù      ù\n" + "              ,$Y;;tYV$$$$$$$$$$$$$$$$$$$$,\n"
+						+ "              $Y;;tYH$$$$$$$$$$$$$$$$$$$$$$\n" + "              $;;iYV$$$$$$$$$$$$$$$$$$$$$$$\n"
+						+ "              $=;IYYV$$$$$$$$$$$$$$$$$$$$$$\n" + "              `Y;;YV$$$$$$$$$$$$$$$$$$$$$$'\n"
+						+ "               `$YV$$$$$$$$$$$$$$$$$$$$$$'\n" + "                `ý$$$$$$$$$$$$$$$$$$$$$ý'\n"
+						+ "                  `ýS$$$$$$$$$$$$$$$Sý'\n" + "                     `'ýýSS$$$SSýý''\n\n" + t.toString() + ": PLAYER " + pID
+						+ "LOST ALL SHIPS!\n\n\n\n");
+
+	}
+
+	private void printFT(List<Node> ft) {
+		if (Starter.PRINT_FINE_GRAIN_SIZE) {
+			System.out.println("\t°\t|\n\t°\t| Fingertable (" + ft.size() + "):");
+			for (int i = 0; i < ft.size(); i++) {
+				System.out.println("\t°\t|\t" + ft.get(i).getNodeID());
+			}
+			System.out.println("\t°\t|");
+		}
+	}
+
+	private void printDroppedBC(Broadcast info) {
+		if (Starter.PRINT_FINE_GRAIN_SIZE) {
+			System.out.println(
+					"\t°\t| Broadcast DROPPED:\n\t°\t|\tsource:\t" + info.getSource() + "\n\t°\t|\trange:\t" + info.getRange() + "\n\t°\t|\ttarget:\t"
+							+ info.getTarget() + "\n\t°\t|\ttns:\t" + info.getTransaction() + "\n\t°\t|\thit:\t" + info.getHit() + "\n\t°\t|");
+		}
+	}
+
+	private void printForwardedBC(ID id, ID rng, Broadcast info) {
+		if (Starter.PRINT_FINE_GRAIN_SIZE) {
+			System.out.println("\t°\t| Broadcast FORWARDED to: " + id + "\n\t°\t|\tsource:\t" + info.getSource() + "\n\t°\t|\trange:\t" + rng
+					+ "\n\t°\t|\ttarget:\t" + info.getTarget() + "\n\t°\t|\ttns:\t" + Math.max(info.getTransaction(), impl.trnID) + "\n\t°\t|\thit:\t"
+					+ info.getHit() + "\n\t°\t|");
+		}
+	}
+
+	private void printEnd() {
+		if (Starter.PRINT_FINE_GRAIN_SIZE) {
+			System.out.println("\t°\t+------------------------------------------------------------------------------------------------------------");
+			System.out.println("\t°");
 		}
 	}
 
